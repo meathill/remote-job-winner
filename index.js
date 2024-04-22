@@ -1,13 +1,18 @@
 import puppeteer from "puppeteer";
 import { writeFile } from 'node:fs/promises';
 import { sleep } from "./utils.js";
+import 'dotenv/config.js';
 
-const browser = await puppeteer.launch({
-  headless: false,
-  userDataDir: './user_data',
-});
+const AUTH = process.env.BRIGHT_DATA_AUTH;
+const SBR_WS_ENDPOINT = `wss://${AUTH}@${process.env.BRIGHT_DATA_SBR_WS_ENDPOINT}`;
+const browser = process.env.DEV
+  ? await puppeteer.launch({
+    headless: false,
+    userDataDir: './user_data',
+  })
+  : await puppeteer.connect({ browserWSEndpoint: SBR_WS_ENDPOINT });
+
 const page = await browser.newPage();
-
 // Set screen size
 await page.setViewport({width: 1280, height: 1373});
 
