@@ -1,8 +1,10 @@
 import puppeteer from "puppeteer";
+import puppeteerCore from "puppeteer-core";
 import { writeFile } from 'node:fs/promises';
 import { sleep } from "./utils.js";
 import 'dotenv/config.js';
 
+console.log('Starting scraper');
 const AUTH = process.env.BRIGHT_DATA_AUTH;
 const SBR_WS_ENDPOINT = `wss://${AUTH}@${process.env.BRIGHT_DATA_SBR_WS_ENDPOINT}`;
 const browser = process.env.DEV
@@ -10,19 +12,25 @@ const browser = process.env.DEV
     headless: false,
     userDataDir: './user_data',
   })
-  : await puppeteer.connect({ browserWSEndpoint: SBR_WS_ENDPOINT });
+  : await puppeteerCore.connect({ browserWSEndpoint: SBR_WS_ENDPOINT });
 
+console.log('Browser connected');
 const page = await browser.newPage();
 // Set screen size
-await page.setViewport({width: 1280, height: 1373});
+if (process.env.DEV) {
+  await page.setViewport({width: 1280, height: 1373});
+}
 
 // Navigate the page to a URL
 await page.goto('https://vuejobs.com/jobs', {
   timeout: 120000,
+  waitUntil: 'domcontentloaded',
 });
+console.log('Page loaded');
 
 // click "remote" switch
-await page.click('[role="switch"]');
+const remoteSwitch = await page.$('button[role="switch"]');
+await remoteSwitch.click();
 
 // only filter full-time
 await page.click('.n-base-selection-tags');
@@ -30,6 +38,7 @@ await page.click('.n-base-select-option');
 
 // wait for list to be loaded
 await sleep(5000);
+console.log('List loaded');
 
 // check all links and find the ones to detail pages
 const allLinks = await page.$$('a');
@@ -50,14 +59,20 @@ for (const link of allLinks) {
   }
 }
 
+console.log('Found', globalRemoteJobLinks.length, 'remote job links');
+
 // fetch all job details
 const jobDetails = [];
 for (const link of globalRemoteJobLinks) {
   const href = await link.evaluate((node) => node.getAttribute('href'));
   const url = `https://vuejobs.com${href}`;
+  console.log('Fetching job details from', url);
   const newPage = await browser.newPage();
-  await newPage.setViewport({width: 1280, height: 1373});
+  if (process.env.DEV) {
+    await newPage.setViewport({width: 1280, height: 1373});
+  }
   await newPage.goto(url, {
+    waitUntil: 'domcontentloaded',
     timeout: 120000,
   });
   await newPage.waitForSelector('button.u-btn.px-6.text-lg[type="submit"]');
@@ -96,6 +111,7 @@ for (const link of globalRemoteJobLinks) {
 
   jobDetails.push({timezone, content});
   await newPage.close();
+  console.log('Job details fetched:', url);
 }
 
 await writeFile('jobs.json', JSON.stringify(jobDetails, null, 2), 'utf8');
