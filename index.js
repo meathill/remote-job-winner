@@ -55,16 +55,16 @@ for (const link of allLinks) {
   });
 
   if (!hasCountry) {
-    globalRemoteJobLinks.push(link);
+    globalRemoteJobLinks.push(href);
   }
 }
 
+await page.close();
 console.log('Found', globalRemoteJobLinks.length, 'remote job links');
 
 // fetch all job details
 const jobDetails = [];
-for (const link of globalRemoteJobLinks) {
-  const href = await link.evaluate((node) => node.getAttribute('href'));
+for (const href of globalRemoteJobLinks) {
   const url = `https://vuejobs.com${href}`;
   console.log('Fetching job details from', url);
   const newPage = await browser.newPage();
